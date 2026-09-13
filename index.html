@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
@@ -95,6 +93,20 @@
   .dropzone p.hint{ margin:0; font-size:.8rem; color:var(--ink-soft); }
   .dropzone .filename{ margin-top:10px; font-size:.83rem; font-weight:600; color:var(--green-dark); word-break:break-all; }
   .dropzone .count{ font-size:.76rem; color:var(--ink-soft); margin-top:2px; }
+
+  .dropzone-simple{ cursor:default; }
+  .dropzone-simple:hover{ border-color:#c7d1c9; background:var(--paper); }
+  .dropzone-simple input[type=text]{
+    width:100%; padding:9px 10px; border-radius:8px; border:1.5px solid #d7ddd6; font-size:.85rem;
+    font-family:inherit; margin-top:14px; margin-bottom:10px; box-sizing:border-box; cursor:text;
+  }
+  .dropzone-simple .live-sheet-note{ text-align:left; }
+  .btn-primary-sm{
+    width:100%; background:var(--green-dark); color:#fff; border:none; padding:10px; border-radius:9px;
+    font-weight:700; font-size:.85rem; cursor:pointer; font-family:'Space Grotesk',sans-serif;
+  }
+  .btn-primary-sm:hover{ background:var(--green); }
+  .btn-primary-sm:disabled{ opacity:.6; cursor:default; }
 
   .live-sheet-row{ margin-top:16px; text-align:left; cursor:default; }
   .live-sheet-divider{
@@ -281,7 +293,6 @@
   }
   .history-file-divider::before, .history-file-divider::after{ content:""; flex:1; height:1px; background:#e2e7e0; }
   .small-btn{ font-size:.78rem; padding:8px 10px; }
-  #editMembersBtn{ margin-top:12px; }
   .history-file-section .small-btn{ width:100%; margin-bottom:6px; }
 
   /* ---------- Export bar ---------- */
@@ -354,26 +365,6 @@
   .modal-actions{ display:flex; gap:10px; margin-top:18px; }
   .modal-actions button{ flex:1; padding:10px; border-radius:9px; font-weight:700; font-size:.85rem; cursor:pointer; border:none; font-family:'Space Grotesk',sans-serif; }
 
-  .members-editor-modal{ max-width:620px; width:95%; }
-  .members-editor-table-wrap{ max-height:50vh; overflow-y:auto; border:1.5px solid #e2e7e0; border-radius:10px; margin-bottom:12px; }
-  table.members-editor-table{ width:100%; border-collapse:collapse; font-size:.82rem; }
-  table.members-editor-table thead th{
-    position:sticky; top:0; background:#f4f6f3; text-align:left; padding:8px 8px; font-size:.72rem;
-    text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); border-bottom:1.5px solid #e2e7e0; z-index:1;
-  }
-  table.members-editor-table td{ padding:5px 8px; border-bottom:1px solid #eef1ec; }
-  table.members-editor-table tr:last-child td{ border-bottom:none; }
-  .me-name{ width:100%; border:1px solid transparent; background:transparent; font-size:.82rem; padding:5px 4px; border-radius:6px; font-family:inherit; }
-  .me-name:hover, .me-name:focus{ border-color:#d7ddd6; background:#fff; outline:none; }
-  .me-gender, .me-level{ border:1px solid #d7ddd6; border-radius:6px; padding:4px; font-size:.8rem; font-family:inherit; background:#fff; }
-  .me-singles{ cursor:pointer; }
-  .me-delete{
-    background:transparent; border:none; color:var(--ink-soft); cursor:pointer; font-size:.85rem;
-    padding:3px 7px; border-radius:6px; line-height:1;
-  }
-  .me-delete:hover{ background:var(--warn-bg); color:var(--warn); }
-  .members-editor-actions{ display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
-  .members-editor-count{ font-size:.76rem; color:var(--ink-soft); margin-left:auto; }
   .modal-actions .confirm{ background:var(--green-dark); color:#fff; }
   .modal-actions .cancel{ background:#eef1ec; color:var(--ink); }
 
@@ -421,28 +412,23 @@
 
   <section id="uploadSection">
     <div class="upload-grid">
-      <div class="dropzone" id="dzMembers">
+      <div class="dropzone dropzone-simple" id="dzMembers">
         <div class="icon">📋</div>
         <h3>Ledenlijst</h3>
-        <p class="hint">Ingebouwd — bewerk hieronder, of upload een nieuw CSV-bestand om te vervangen.</p>
+        <input type="text" id="memberSheetUrlInput" placeholder="Link naar de Google Sheet met de ledenlijst" value="https://docs.google.com/spreadsheets/d/1aivRhIMm7HE3vKTo7HeEfsRSiazhGW-QR03crMOI7Hc/edit?usp=sharing">
+        <button type="button" class="btn-primary-sm" id="memberSheetFetchBtn">🔄 Ophalen</button>
         <div class="filename" id="dzMembersFile"></div>
         <div class="count" id="dzMembersCount"></div>
-        <input type="file" accept=".csv" class="hidden-input" id="inputMembers">
-        <button type="button" class="btn-ghost small-btn no-capture" id="editMembersBtn" onclick="event.stopPropagation()">✏️ Ledenlijst bekijken/bewerken</button>
+        <p class="live-sheet-note">Vereist dat de Sheet gedeeld is als "Iedereen met de link kan bekijken". Kolommen: Naam, Geslacht, Niveau (1-5), Bereid om enkel te spelen (JA/NEE).</p>
       </div>
-      <div class="dropzone" id="dzRegs">
+      <div class="dropzone dropzone-simple" id="dzRegs">
         <div class="icon">📝</div>
         <h3>Inschrijvingen (Google Forms)</h3>
-        <p class="hint">Excel (.xlsx) — ruwe Google Forms-export, wordt automatisch opgeschoond.<br>Ook CSV met Tijdstempel, Naam, Beschikbare uren, Opmerkingen wordt herkend.</p>
+        <input type="text" id="sheetUrlInput" placeholder="Link naar de Google Sheet met antwoorden" value="https://docs.google.com/spreadsheets/d/1md1Gp_rwkr0QFjiAKogLYObaRangQeXkpCvPZtVfjeg/edit?usp=sharing">
+        <button type="button" class="btn-primary-sm" id="sheetFetchBtn">🔄 Ophalen</button>
         <div class="filename" id="dzRegsFile"></div>
         <div class="count" id="dzRegsCount"></div>
-        <input type="file" accept=".csv,.xlsx,.xls" class="hidden-input" id="inputRegs">
-        <div class="live-sheet-row no-capture" onclick="event.stopPropagation()">
-          <div class="live-sheet-divider"><span>of live koppelen</span></div>
-          <input type="text" id="sheetUrlInput" placeholder="Link naar de Google Sheet met antwoorden" value="https://docs.google.com/spreadsheets/d/1md1Gp_rwkr0QFjiAKogLYObaRangQeXkpCvPZtVfjeg/edit?usp=sharing">
-          <button type="button" class="btn-ghost" id="sheetFetchBtn">🔄 Ophalen</button>
-          <p class="live-sheet-note">Vereist dat de Sheet gedeeld is als "Iedereen met de link kan bekijken".</p>
-        </div>
+        <p class="live-sheet-note">Vereist dat de Sheet gedeeld is als "Iedereen met de link kan bekijken". Kolommen: Tijdstempel, E-mailadres, Naam + voornaam, GSM-nummer, Niveau, Tijdstip vanaf, Tijdstip tot, Opmerking.</p>
       </div>
     </div>
 
@@ -473,6 +459,7 @@
           <label class="auto-refresh-toggle" id="autoRefreshToggle" style="display:none;">
             <input type="checkbox" id="autoRefreshCheckbox"> Auto-ververs (30s)
           </label>
+          <button class="btn-ghost" id="memberSheetRefreshBtn" style="display:none;">🔄 Ledenlijst opnieuw ophalen</button>
           <button class="btn-ghost" id="sheetRefreshBtn" style="display:none;">🔄 Nieuwe inschrijvingen ophalen</button>
           <button class="btn-ghost" id="backToUploadBtn">⬅ Nieuwe bestanden uploaden</button>
           <button class="btn-ghost" id="regenBtn">🔁 Herbereken</button>
@@ -569,99 +556,12 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="membersEditorOverlay">
-  <div class="modal members-editor-modal">
-    <h3>📋 Ledenlijst beheren</h3>
-    <p class="sub">Wijzigingen gelden meteen voor deze sessie. Download de lijst als CSV om ze te bewaren of later opnieuw te gebruiken.</p>
-    <div class="members-editor-table-wrap">
-      <table class="members-editor-table">
-        <thead>
-          <tr>
-            <th>Naam</th>
-            <th>Geslacht</th>
-            <th>Niveau</th>
-            <th>Enkelspel</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="membersEditorBody"></tbody>
-      </table>
-    </div>
-    <div class="members-editor-actions">
-      <button class="btn-ghost small-btn" id="addMemberBtn">＋ Lid toevoegen</button>
-      <button class="btn-ghost small-btn" id="downloadMembersCsvBtn">💾 Download als CSV</button>
-      <span class="members-editor-count" id="membersEditorCount"></span>
-    </div>
-    <div class="modal-actions">
-      <button class="confirm" id="membersEditorCloseBtn" style="flex:1;">Sluiten</button>
-    </div>
-  </div>
-</div>
-
 <script>
 (function(){
   "use strict";
 
   /* ============ State ============ */
   const HOURS = [19,20,21];
-  const DEFAULT_MEMBERS = [
-    {name:"Adams Alice", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Amelie Van Damme", gender:"Vrouw", level:4, singlesOk:false},
-    {name:"Anouk De Keyser", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Ben Buysse", gender:"Man", level:5, singlesOk:false},
-    {name:"Bert leoen", gender:"Man", level:3, singlesOk:true},
-    {name:"Braem Mieke", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Bram D'Hondt", gender:"Man", level:5, singlesOk:false},
-    {name:"Brutin Lies", gender:"Vrouw", level:1, singlesOk:false},
-    {name:"Cano Vandenhove, Alberto", gender:"Man", level:5, singlesOk:true},
-    {name:"Caroline Storme", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Ceyssens Marc", gender:"Man", level:5, singlesOk:false},
-    {name:"Claeys Stephen", gender:"Man", level:5, singlesOk:false},
-    {name:"Claus Peter", gender:"Man", level:4, singlesOk:false},
-    {name:"Daniëlle Peeters", gender:"Vrouw", level:4, singlesOk:false},
-    {name:"Davy Dhondt", gender:"Man", level:5, singlesOk:false},
-    {name:"De Raedt Bert", gender:"Man", level:3, singlesOk:false},
-    {name:"De Schacht Dries", gender:"Man", level:5, singlesOk:true},
-    {name:"Eddy Janssens", gender:"Man", level:3, singlesOk:false},
-    {name:"eddy ryckaert", gender:"Man", level:3, singlesOk:false},
-    {name:"Els Van Poucke", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Emilie De Roo", gender:"Vrouw", level:1, singlesOk:false},
-    {name:"Eric de Burbure", gender:"Man", level:3, singlesOk:false},
-    {name:"Evelyne Joye", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Fre Timmerman", gender:"Man", level:2, singlesOk:false},
-    {name:"Frederik Bauwens", gender:"Man", level:5, singlesOk:false},
-    {name:"Greet Cleppe", gender:"Vrouw", level:4, singlesOk:false},
-    {name:"Harmelink Nienke", gender:"Vrouw", level:1, singlesOk:false},
-    {name:"Hilde De la Rue", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Ine Timmerman", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Ines Wouters", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Jan Hiels", gender:"Man", level:5, singlesOk:true},
-    {name:"Johan Dehandschutter", gender:"Man", level:4, singlesOk:false},
-    {name:"Johan van lerbeirghe", gender:"Man", level:3, singlesOk:false},
-    {name:"Joren Bussens", gender:"Man", level:5, singlesOk:true},
-    {name:"Katrien Potums", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Kristin Smet", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Kristof dhoore", gender:"Man", level:5, singlesOk:false},
-    {name:"Lara Vukovic / Vanden Bosch", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Laurent Boery", gender:"Man", level:3, singlesOk:false},
-    {name:"Lieven De Pauw", gender:"Man", level:5, singlesOk:false},
-    {name:"Madina Urutskoeva", gender:"Vrouw", level:1, singlesOk:false},
-    {name:"Nancy Van de Putte", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Neyt Sabine", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Olivia Van Damme", gender:"Vrouw", level:4, singlesOk:false},
-    {name:"Quinten Isabelle", gender:"Vrouw", level:5, singlesOk:true},
-    {name:"Sarah Van Eeckhout", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Smet Patricia", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Staelens Louis", gender:"Man", level:5, singlesOk:true},
-    {name:"Stevens Lien", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Sven Bassez", gender:"Man", level:5, singlesOk:false},
-    {name:"Thomas Boery", gender:"Man", level:4, singlesOk:true},
-    {name:"Van Hullebusch Natalie", gender:"Vrouw", level:5, singlesOk:false},
-    {name:"Van Rie Jonas", gender:"Man", level:3, singlesOk:false},
-    {name:"Verdonck Elena", gender:"Vrouw", level:3, singlesOk:false},
-    {name:"Wouter Maenhaut", gender:"Man", level:5, singlesOk:true}
-  ];
-
   let members = {};          // normalizedName -> {name, gender, level}
   let registrations = [];    // {name, normalizedName, timestamp, hoursRaw, remarks, regIndex}
   let membersLoaded = false, regsLoaded = false;
@@ -729,53 +629,6 @@
   }
 
   function newId(){ return "p" + (idCounter++); }
-
-  /* ============ CSV parsing ============ */
-  function detectDelimiter(text){
-    const firstLine = (text.split(/\r?\n/)[0] || "");
-    const counts = {
-      ",": (firstLine.match(/,/g) || []).length,
-      ";": (firstLine.match(/;/g) || []).length,
-      "\t": (firstLine.match(/\t/g) || []).length
-    };
-    let best = ",", bestCount = 0;
-    Object.keys(counts).forEach(k=>{ if (counts[k] > bestCount){ bestCount = counts[k]; best = k; } });
-    return bestCount > 0 ? best : ",";
-  }
-
-  function parseCsvFile(file, cb){
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      let text = e.target.result;
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // strip BOM
-      const delimiter = detectDelimiter(text);
-      const res = Papa.parse(text, { delimiter, skipEmptyLines: true });
-      cb(res.data);
-    };
-    reader.readAsText(file, "UTF-8");
-  }
-
-  /* ============ Excel parsing (raw Google Forms export) ============ */
-  function parseExcelFile(file, cb){
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        // raw:false -> cells come back as their displayed text (handles both plain-text
-        // and any numeric/date-formatted answers the same way); defval:"" fills gaps so
-        // every row has a consistent number of columns to index into below.
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-        cb(rows);
-      } catch (err){
-        console.error("Excel-bestand kon niet gelezen worden:", err);
-        notifyError("Kon het Excel-bestand niet lezen: " + (err && err.message ? err.message : String(err)));
-      }
-    };
-    reader.onerror = ()=> notifyError("Kon het Excel-bestand niet lezen.");
-    reader.readAsArrayBuffer(file);
-  }
 
   /* Raw Google Forms export/response-sheet has extra columns the club doesn't use. Keep only:
      A = Tijdstempel, C = Naam, F+G = tijdstip vanaf/tot (merged), H = Opmerking.
@@ -914,17 +767,8 @@
     }
   }
 
-  /* ============ Ledenlijst: ingebouwd, bewerkbaar binnen de app ============ */
-  let currentMembersLabel = "Ingebouwde ledenlijst";
-
-  function loadDefaultMembers(){
-    members = {};
-    DEFAULT_MEMBERS.forEach(m=>{
-      members[normalize(m.name)] = { name: m.name, gender: m.gender, level: m.level, singlesOk: !!m.singlesOk };
-    });
-    membersLoaded = true;
-    refreshMembersDropzoneUI();
-  }
+  /* ============ Ledenlijst: uitsluitend via live Google Sheet-koppeling ============ */
+  let currentMembersLabel = "Live Google Sheet";
 
   function refreshMembersDropzoneUI(){
     const count = Object.keys(members).length;
@@ -933,104 +777,6 @@
     document.getElementById("dzMembersCount").textContent = count + " leden";
     updateGenerateBtn();
   }
-
-  function renderMembersEditorTable(){
-    const tbody = document.getElementById("membersEditorBody");
-    const keys = Object.keys(members).sort((a,b)=> members[a].name.localeCompare(members[b].name, "nl"));
-    tbody.innerHTML = keys.map(key=>{
-      const m = members[key];
-      return `<tr data-key="${escapeHtml(key)}">
-        <td><input type="text" class="me-name" value="${escapeHtml(m.name)}"></td>
-        <td><select class="me-gender">
-          <option value="Man" ${m.gender==="Man"?"selected":""}>Man</option>
-          <option value="Vrouw" ${m.gender==="Vrouw"?"selected":""}>Vrouw</option>
-        </select></td>
-        <td><select class="me-level">${[1,2,3,4,5].map(l=>`<option value="${l}" ${m.level===l?"selected":""}>${l}</option>`).join("")}</select></td>
-        <td style="text-align:center;"><input type="checkbox" class="me-singles" ${m.singlesOk?"checked":""}></td>
-        <td><button class="me-delete" title="Verwijderen">×</button></td>
-      </tr>`;
-    }).join("");
-    document.getElementById("membersEditorCount").textContent = keys.length + " leden";
-    wireMembersEditorRows();
-  }
-
-  function wireMembersEditorRows(){
-    document.querySelectorAll("#membersEditorBody tr").forEach(tr=>{
-      const nameInput = tr.querySelector(".me-name");
-      const genderSelect = tr.querySelector(".me-gender");
-      const levelSelect = tr.querySelector(".me-level");
-      const singlesCheckbox = tr.querySelector(".me-singles");
-      const deleteBtn = tr.querySelector(".me-delete");
-
-      nameInput.addEventListener("change", ()=>{
-        const key = tr.dataset.key;
-        const newName = nameInput.value.trim();
-        if (!newName){ nameInput.value = members[key].name; return; }
-        const newKey = normalize(newName);
-        const data = members[key];
-        data.name = newName;
-        if (newKey !== key){
-          delete members[key];
-          members[newKey] = data;
-          tr.dataset.key = newKey;
-        }
-      });
-      genderSelect.addEventListener("change", ()=>{ members[tr.dataset.key].gender = genderSelect.value; });
-      levelSelect.addEventListener("change", ()=>{ members[tr.dataset.key].level = parseInt(levelSelect.value,10); });
-      singlesCheckbox.addEventListener("change", ()=>{ members[tr.dataset.key].singlesOk = singlesCheckbox.checked; });
-      deleteBtn.addEventListener("click", async ()=>{
-        const key = tr.dataset.key;
-        const ok = await customConfirm(`"${members[key].name}" verwijderen uit de ledenlijst?`);
-        if (!ok) return;
-        delete members[key];
-        renderMembersEditorTable();
-        refreshMembersDropzoneUI();
-      });
-    });
-  }
-
-  document.getElementById("editMembersBtn").addEventListener("click", ()=>{
-    renderMembersEditorTable();
-    document.getElementById("membersEditorOverlay").classList.add("show");
-  });
-  document.getElementById("membersEditorCloseBtn").addEventListener("click", ()=>{
-    document.getElementById("membersEditorOverlay").classList.remove("show");
-    refreshMembersDropzoneUI();
-  });
-  document.getElementById("addMemberBtn").addEventListener("click", ()=>{
-    let baseName = "Nieuw lid", name = baseName, i = 1;
-    while (members[normalize(name)]) { i++; name = baseName + " " + i; }
-    members[normalize(name)] = { name, gender: "Man", level: 3, singlesOk: false };
-    renderMembersEditorTable();
-    refreshMembersDropzoneUI();
-    requestAnimationFrame(()=>{
-      const rows = document.querySelectorAll("#membersEditorBody tr");
-      const lastRow = rows[rows.length-1];
-      if (lastRow){
-        lastRow.scrollIntoView({ block: "nearest" });
-        const inp = lastRow.querySelector(".me-name");
-        if (inp){ inp.focus(); inp.select(); }
-      }
-    });
-  });
-  document.getElementById("downloadMembersCsvBtn").addEventListener("click", ()=>{
-    const keys = Object.keys(members).sort((a,b)=> members[a].name.localeCompare(members[b].name, "nl"));
-    const lines = ["Naam + voornaam;Geslacht;Niveau;Bereid om enkel te spelen?"];
-    keys.forEach(k=>{
-      const m = members[k];
-      lines.push(`${m.name};${m.gender};${m.level};${m.singlesOk ? "JA" : ""}`);
-    });
-    const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.download = "ledenlijst.csv";
-    link.href = url;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast("Ledenlijst gedownload ✅");
-  });
 
   function loadRegsRows(rows){
     registrations = [];
@@ -1094,15 +840,6 @@
     });
   }
 
-  wireDropzone("dzMembers","inputMembers", (file)=>{
-    parseCsvFile(file, (rows)=>{
-      loadMembersRows(rows);
-      membersLoaded = true;
-      currentMembersLabel = file.name;
-      refreshMembersDropzoneUI();
-    });
-  });
-
   function applyRegsRows(rows, sourceLabel){
     loadRegsRows(rows);
     regsLoaded = true;
@@ -1111,18 +848,6 @@
     document.getElementById("dzRegsCount").textContent = registrations.length + " inschrijvingen geladen";
     updateGenerateBtn();
   }
-
-  wireDropzone("dzRegs","inputRegs", (file)=>{
-    if (/\.xlsx?$/i.test(file.name)){
-      if (typeof XLSX === "undefined"){
-        notifyError("De Excel-bibliotheek kon niet geladen worden — waarschijnlijk blokkeert je netwerk/firewall cdnjs.cloudflare.com. Exporteer het Google Forms-antwoordenblad eventueel als CSV in plaats van Excel.");
-        return;
-      }
-      parseExcelFile(file, (rawRows)=> applyRegsRows(transformGoogleFormsRows(rawRows), file.name));
-    } else {
-      parseCsvFile(file, (rows)=> applyRegsRows(rows, file.name));
-    }
-  });
 
   function updateGenerateBtn(){
     document.getElementById("generateBtn").disabled = !(membersLoaded && regsLoaded && selectedSeason);
@@ -1151,10 +876,10 @@
     opt.addEventListener("click", ()=> setSeason(opt.dataset.val));
   });
   setSeason(computeDefaultSeason());
-  loadDefaultMembers();
 
   /* ---- Live Google Sheet: fetch on click, optional refresh + auto-poll once a schedule exists ---- */
   let liveSheetId = null, liveSheetGid = null, autoRefreshTimer = null;
+  let liveMemberSheetId = null, liveMemberSheetGid = null;
 
   function stopAutoRefresh(){
     if (autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
@@ -1177,6 +902,28 @@
       console.error("Live Sheet verversen mislukt:", err);
       if (!silent){
         notifyError("Kon de Google Sheet niet verversen: " + (err && err.message ? err.message : String(err)));
+      }
+    });
+  }
+
+  function refreshFromLiveMemberSheet(silent){
+    if (!liveMemberSheetId) return;
+    const before = Object.keys(members).length;
+    fetchGoogleSheetRows(liveMemberSheetId, liveMemberSheetGid).then(rawRows=>{
+      loadMembersRows(rawRows);
+      membersLoaded = true;
+      currentMembersLabel = "Live Google Sheet";
+      refreshMembersDropzoneUI();
+      const diff = Object.keys(members).length - before;
+      if (!silent){
+        toast("Ledenlijst ververst ✅");
+      } else if (diff !== 0){
+        toast(`Ledenlijst bijgewerkt (${diff>0?'+':''}${diff} leden)`);
+      }
+    }).catch(err=>{
+      console.error("Ledenlijst verversen mislukt:", err);
+      if (!silent){
+        notifyError("Kon de ledenlijst niet verversen: " + (err && err.message ? err.message : String(err)));
       }
     });
   }
@@ -1205,11 +952,42 @@
     });
   });
 
+  document.getElementById("memberSheetFetchBtn").addEventListener("click", ()=>{
+    const raw = document.getElementById("memberSheetUrlInput").value;
+    const sheetId = extractSheetId(raw);
+    if (!sheetId){
+      notifyError("Kon geen geldige Google Sheet-link herkennen. Plak de volledige link (of het Sheet-ID) van de spreadsheet met de ledenlijst.");
+      return;
+    }
+    const btn = document.getElementById("memberSheetFetchBtn");
+    const originalLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ Ophalen…";
+    fetchGoogleSheetRows(sheetId, extractGid(raw)).then(rawRows=>{
+      liveMemberSheetId = sheetId; liveMemberSheetGid = extractGid(raw);
+      loadMembersRows(rawRows);
+      membersLoaded = true;
+      currentMembersLabel = "Live Google Sheet";
+      refreshMembersDropzoneUI();
+      document.getElementById("memberSheetRefreshBtn").style.display = "";
+      document.getElementById("autoRefreshToggle").style.display = "";
+      toast("Ledenlijst live opgehaald ✅");
+    }).catch(err=>{
+      console.error("Ledenlijst live ophalen mislukt:", err);
+      notifyError("Kon de ledenlijst niet ophalen: " + (err && err.message ? err.message : String(err)) + "\n\nControleer of de sheet gedeeld is als \"Iedereen met de link kan bekijken\", of bewerk de ledenlijst handmatig als alternatief.");
+    }).finally(()=>{
+      btn.disabled = false; btn.textContent = originalLabel;
+    });
+  });
+
   document.getElementById("sheetRefreshBtn").addEventListener("click", ()=> refreshFromLiveSheet(false));
+  document.getElementById("memberSheetRefreshBtn").addEventListener("click", ()=> refreshFromLiveMemberSheet(false));
 
   document.getElementById("autoRefreshCheckbox").addEventListener("change", (e)=>{
     if (e.target.checked){
-      autoRefreshTimer = setInterval(()=> refreshFromLiveSheet(true), 30000);
+      autoRefreshTimer = setInterval(()=>{
+        refreshFromLiveSheet(true);
+        refreshFromLiveMemberSheet(true);
+      }, 30000);
     } else {
       stopAutoRefresh();
     }
@@ -1232,7 +1010,9 @@
     stopAutoRefresh();
     liveSheetId = null; liveSheetGid = null;
     document.getElementById("sheetUrlInput").value = "https://docs.google.com/spreadsheets/d/1md1Gp_rwkr0QFjiAKogLYObaRangQeXkpCvPZtVfjeg/edit?usp=sharing";
+    document.getElementById("memberSheetUrlInput").value = "https://docs.google.com/spreadsheets/d/1aivRhIMm7HE3vKTo7HeEfsRSiazhGW-QR03crMOI7Hc/edit?usp=sharing";
     document.getElementById("sheetRefreshBtn").style.display = "none";
+    document.getElementById("memberSheetRefreshBtn").style.display = liveMemberSheetId ? "" : "none";
     document.getElementById("autoRefreshToggle").style.display = "none";
     document.getElementById("autoRefreshCheckbox").checked = false;
     document.getElementById("dzRegs").classList.remove("loaded");
@@ -1256,6 +1036,7 @@
     stopAutoRefresh();
     liveSheetId = null; liveSheetGid = null;
     document.getElementById("sheetRefreshBtn").style.display = "none";
+    document.getElementById("memberSheetRefreshBtn").style.display = liveMemberSheetId ? "" : "none";
     document.getElementById("autoRefreshToggle").style.display = "none";
     document.getElementById("dzRegs").classList.remove("loaded");
     document.getElementById("dzRegsFile").textContent = "";
@@ -1768,6 +1549,9 @@
     });
     document.getElementById("uploadSection").style.display = "none";
     document.getElementById("scheduleWrap").classList.add("show");
+    if (liveSheetId) document.getElementById("sheetRefreshBtn").style.display = "";
+    if (liveMemberSheetId) document.getElementById("memberSheetRefreshBtn").style.display = "";
+    if (liveSheetId || liveMemberSheetId) document.getElementById("autoRefreshToggle").style.display = "";
     const dateInput = document.getElementById("scheduleDate");
     if (dateInput && !dateInput.value){
       dateInput.value = isoDate(nextUpcomingMonday());

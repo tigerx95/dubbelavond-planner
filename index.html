@@ -71,11 +71,6 @@
   }
   header.top h1{ margin:0; font-size:1.5rem; font-weight:700; }
   header.top p{ margin:2px 0 0; font-size:.87rem; color:rgba(255,255,255,.78); }
-  .reset-btn{
-    margin-left:auto; background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.35);
-    padding:8px 14px; border-radius:9px; font-size:.82rem; cursor:pointer; font-weight:600;
-  }
-  .reset-btn:hover{ background:rgba(255,255,255,.22); }
 
   main{ max-width:1480px; margin:0 auto; padding:26px 20px 0; }
 
@@ -122,9 +117,6 @@
   .live-sheet-note{ margin:8px 0 0; font-size:.72rem; color:var(--ink-soft); line-height:1.4; }
   .history-reload-row{ margin-top:8px; }
   .history-reload-row .live-sheet-divider{ margin:0 0 10px; }
-  .auto-refresh-toggle{
-    display:flex; align-items:center; gap:6px; font-size:.82rem; color:var(--ink-soft); cursor:pointer; font-weight:600;
-  }
 
   .generate-row{ display:flex; justify-content:center; margin:22px 0 6px; }
   .season-section{ margin-top:20px; }
@@ -404,7 +396,6 @@
       <h1>Dubbelavond Planner</h1>
       <p>Automatische baanverdeling voor de wekelijkse tennisavond</p>
     </div>
-    <button class="reset-btn no-capture" id="resetBtn">↺ Nieuw schema</button>
   </div>
 </header>
 
@@ -456,13 +447,7 @@
             <button class="tab" data-hour="21">21:00</button>
           </div>
           <div class="spacer"></div>
-          <label class="auto-refresh-toggle" id="autoRefreshToggle" style="display:none;">
-            <input type="checkbox" id="autoRefreshCheckbox"> Auto-ververs (30s)
-          </label>
-          <button class="btn-ghost" id="memberSheetRefreshBtn" style="display:none;">🔄 Ledenlijst opnieuw ophalen</button>
-          <button class="btn-ghost" id="sheetRefreshBtn" style="display:none;">🔄 Nieuwe inschrijvingen ophalen</button>
           <button class="btn-ghost" id="backToUploadBtn">⬅ Nieuwe bestanden uploaden</button>
-          <button class="btn-ghost" id="regenBtn">🔁 Herbereken</button>
         </div>
 
         <div class="export-bar no-capture">
@@ -877,57 +862,7 @@
   });
   setSeason(computeDefaultSeason());
 
-  /* ---- Live Google Sheet: fetch on click, optional refresh + auto-poll once a schedule exists ---- */
-  let liveSheetId = null, liveSheetGid = null, autoRefreshTimer = null;
-  let liveMemberSheetId = null, liveMemberSheetGid = null;
-
-  function stopAutoRefresh(){
-    if (autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-    const cb = document.getElementById("autoRefreshCheckbox");
-    if (cb) cb.checked = false;
-  }
-
-  function refreshFromLiveSheet(silent){
-    if (!liveSheetId) return;
-    const before = registrations.length;
-    fetchGoogleSheetRows(liveSheetId, liveSheetGid).then(rawRows=>{
-      applyRegsRows(transformGoogleFormsRows(rawRows), "Live Google Sheet");
-      const added = registrations.length - before;
-      if (!silent){
-        toast("Inschrijvingen ververst ✅");
-      } else if (added !== 0){
-        toast(`${Math.abs(added)} inschrijving${Math.abs(added)>1?'en':''} ${added>0?'bijgekomen':'weggevallen'} — klik "Herbereken" om te verwerken`);
-      }
-    }).catch(err=>{
-      console.error("Live Sheet verversen mislukt:", err);
-      if (!silent){
-        notifyError("Kon de Google Sheet niet verversen: " + (err && err.message ? err.message : String(err)));
-      }
-    });
-  }
-
-  function refreshFromLiveMemberSheet(silent){
-    if (!liveMemberSheetId) return;
-    const before = Object.keys(members).length;
-    fetchGoogleSheetRows(liveMemberSheetId, liveMemberSheetGid).then(rawRows=>{
-      loadMembersRows(rawRows);
-      membersLoaded = true;
-      currentMembersLabel = "Live Google Sheet";
-      refreshMembersDropzoneUI();
-      const diff = Object.keys(members).length - before;
-      if (!silent){
-        toast("Ledenlijst ververst ✅");
-      } else if (diff !== 0){
-        toast(`Ledenlijst bijgewerkt (${diff>0?'+':''}${diff} leden)`);
-      }
-    }).catch(err=>{
-      console.error("Ledenlijst verversen mislukt:", err);
-      if (!silent){
-        notifyError("Kon de ledenlijst niet verversen: " + (err && err.message ? err.message : String(err)));
-      }
-    });
-  }
-
+  /* ---- Live Google Sheet: fetch on click ---- */
   document.getElementById("sheetFetchBtn").addEventListener("click", ()=>{
     const raw = document.getElementById("sheetUrlInput").value;
     const sheetId = extractSheetId(raw);
@@ -939,14 +874,11 @@
     const originalLabel = btn.textContent;
     btn.disabled = true; btn.textContent = "⏳ Ophalen…";
     fetchGoogleSheetRows(sheetId, extractGid(raw)).then(rawRows=>{
-      liveSheetId = sheetId; liveSheetGid = extractGid(raw);
       applyRegsRows(transformGoogleFormsRows(rawRows), "Live Google Sheet");
-      document.getElementById("sheetRefreshBtn").style.display = "";
-      document.getElementById("autoRefreshToggle").style.display = "";
       toast("Inschrijvingen live opgehaald ✅");
     }).catch(err=>{
       console.error("Live Sheet ophalen mislukt:", err);
-      notifyError("Kon de Google Sheet niet ophalen: " + (err && err.message ? err.message : String(err)) + "\n\nControleer of de sheet gedeeld is als \"Iedereen met de link kan bekijken\", of upload het bestand handmatig als alternatief.");
+      notifyError("Kon de Google Sheet niet ophalen: " + (err && err.message ? err.message : String(err)) + "\n\nControleer of de sheet gedeeld is als \"Iedereen met de link kan bekijken\".");
     }).finally(()=>{
       btn.disabled = false; btn.textContent = originalLabel;
     });
@@ -963,81 +895,26 @@
     const originalLabel = btn.textContent;
     btn.disabled = true; btn.textContent = "⏳ Ophalen…";
     fetchGoogleSheetRows(sheetId, extractGid(raw)).then(rawRows=>{
-      liveMemberSheetId = sheetId; liveMemberSheetGid = extractGid(raw);
       loadMembersRows(rawRows);
       membersLoaded = true;
       currentMembersLabel = "Live Google Sheet";
       refreshMembersDropzoneUI();
-      document.getElementById("memberSheetRefreshBtn").style.display = "";
-      document.getElementById("autoRefreshToggle").style.display = "";
       toast("Ledenlijst live opgehaald ✅");
     }).catch(err=>{
       console.error("Ledenlijst live ophalen mislukt:", err);
-      notifyError("Kon de ledenlijst niet ophalen: " + (err && err.message ? err.message : String(err)) + "\n\nControleer of de sheet gedeeld is als \"Iedereen met de link kan bekijken\", of bewerk de ledenlijst handmatig als alternatief.");
+      notifyError("Kon de ledenlijst niet ophalen: " + (err && err.message ? err.message : String(err)) + "\n\nControleer of de sheet gedeeld is als \"Iedereen met de link kan bekijken\".");
     }).finally(()=>{
       btn.disabled = false; btn.textContent = originalLabel;
     });
   });
 
-  document.getElementById("sheetRefreshBtn").addEventListener("click", ()=> refreshFromLiveSheet(false));
-  document.getElementById("memberSheetRefreshBtn").addEventListener("click", ()=> refreshFromLiveMemberSheet(false));
-
-  document.getElementById("autoRefreshCheckbox").addEventListener("change", (e)=>{
-    if (e.target.checked){
-      autoRefreshTimer = setInterval(()=>{
-        refreshFromLiveSheet(true);
-        refreshFromLiveMemberSheet(true);
-      }, 30000);
-    } else {
-      stopAutoRefresh();
-    }
-  });
-
   document.getElementById("generateBtn").addEventListener("click", startGenerationFlow);
-
-  document.getElementById("regenBtn").addEventListener("click", async ()=>{
-    const ok = await customConfirm("Een volledig nieuw schema genereren? Handmatige aanpassingen in het huidige schema gaan verloren.");
-    if (!ok) return;
-    startGenerationFlow();
-  });
-
-  document.getElementById("resetBtn").addEventListener("click", async ()=>{
-    const ok = await customConfirm("Weet je zeker dat je een nieuw schema wil starten? Het huidige (nog niet bewaarde) schema en de inschrijvingen gaan verloren. De ledenlijst blijft behouden.");
-    if (!ok) return;
-    regsLoaded = false;
-    registrations = [];
-    schedule = {};
-    stopAutoRefresh();
-    liveSheetId = null; liveSheetGid = null;
-    document.getElementById("sheetUrlInput").value = "https://docs.google.com/spreadsheets/d/1md1Gp_rwkr0QFjiAKogLYObaRangQeXkpCvPZtVfjeg/edit?usp=sharing";
-    document.getElementById("memberSheetUrlInput").value = "https://docs.google.com/spreadsheets/d/1aivRhIMm7HE3vKTo7HeEfsRSiazhGW-QR03crMOI7Hc/edit?usp=sharing";
-    document.getElementById("sheetRefreshBtn").style.display = "none";
-    document.getElementById("memberSheetRefreshBtn").style.display = liveMemberSheetId ? "" : "none";
-    document.getElementById("autoRefreshToggle").style.display = "none";
-    document.getElementById("autoRefreshCheckbox").checked = false;
-    document.getElementById("dzRegs").classList.remove("loaded");
-    document.getElementById("dzRegsFile").textContent = "";
-    document.getElementById("dzRegsCount").textContent = "";
-    document.getElementById("scheduleDate").value = "";
-    setSeason(computeDefaultSeason());
-    syncDateDisplay();
-    refreshMembersDropzoneUI();
-    updateGenerateBtn();
-    document.getElementById("scheduleWrap").classList.remove("show");
-    document.getElementById("uploadSection").style.display = "";
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
 
   document.getElementById("backToUploadBtn").addEventListener("click", async ()=>{
     const ok = await customConfirm("Terug naar de uploadstap om nieuwe inschrijvingen te kiezen? Het huidige schema blijft bewaard tot je opnieuw op \"Genereer schema\" klikt. De ledenlijst blijft behouden.");
     if (!ok) return;
     regsLoaded = false;
     registrations = [];
-    stopAutoRefresh();
-    liveSheetId = null; liveSheetGid = null;
-    document.getElementById("sheetRefreshBtn").style.display = "none";
-    document.getElementById("memberSheetRefreshBtn").style.display = liveMemberSheetId ? "" : "none";
-    document.getElementById("autoRefreshToggle").style.display = "none";
     document.getElementById("dzRegs").classList.remove("loaded");
     document.getElementById("dzRegsFile").textContent = "";
     document.getElementById("dzRegsCount").textContent = "";
@@ -1119,7 +996,9 @@
 
   function buildLevelClusteredGroups(players){
     const buckets = {};
-    for (let l=1; l<=5; l++) buckets[l] = shuffle(players.filter(p=> p.level === l));
+    for (let l=1; l<=5; l++){
+      buckets[l] = players.filter(p=> p.level === l).sort((a,b)=> a.regIndex - b.regIndex);
+    }
 
     function peelHomogeneous(pool){
       const men = pool.filter(p=> p.gender === "Man");
@@ -1428,6 +1307,82 @@
       if (groups.every(isValid)) break;
     }
 
+    // If one court ends up short (fewer than 4 players), fill it with whoever registered
+    // LAST rather than whoever the level-clustering happened to leave over — later
+    // registrants are the ones who should end up on the not-quite-full court, not earlier
+    // ones. Only swap with a candidate when doing so keeps both sides gender-valid, and
+    // never move a player who is locked into a partner request.
+    (function prioritizeLatestRegistrantsForIncompleteCourt(){
+      const tail = groups[groups.length - 1];
+      if (!tail || tail.length === 0 || tail.length >= 4) return;
+      const allPlayers = groups.flat();
+      const targetLatest = [...allPlayers].sort((a,b)=> b.regIndex - a.regIndex).slice(0, tail.length);
+
+      function findOwner(p){
+        for (let gi=0; gi<groups.length-1; gi++){
+          const idx = groups[gi].indexOf(p);
+          if (idx !== -1) return { group: groups[gi], idx };
+        }
+        return null;
+      }
+
+      for (let pass=0; pass<4; pass++){
+        let changed = false;
+        targetLatest.forEach(target=>{
+          if (tail.includes(target) || target.locked) return;
+          const owner = findOwner(target);
+          if (!owner) return;
+          let swapIdx = -1;
+          for (let ti=0; ti<tail.length; ti++){
+            const candidate = tail[ti];
+            if (candidate.locked || targetLatest.includes(candidate)) continue;
+            const testSource = owner.group.slice(); testSource[owner.idx] = candidate;
+            const testTail = tail.slice(); testTail[ti] = target;
+            if (isValid(testSource) && isValid(testTail)){ swapIdx = ti; break; }
+          }
+          if (swapIdx === -1) return; // try the 3-way fallback below instead
+          const tmp = tail[swapIdx];
+          tail[swapIdx] = target;
+          owner.group[owner.idx] = tmp;
+          changed = true;
+        });
+        if (!changed) break;
+      }
+
+      // Fallback for same-gender targets stuck in different source groups: a plain
+      // 1-for-1 swap always unbalances a valid 4-person group when it trades one gender
+      // for the other, so pull a same-gender "helper" from the second target's group into
+      // the first (net zero change there), then send both outgoing tail candidates to the
+      // second group instead (a clean -2/+2 that keeps it valid too).
+      let remaining = targetLatest.filter(t=> !tail.includes(t) && !t.locked);
+      for (let i=0; i<remaining.length; i++){
+        for (let j=i+1; j<remaining.length; j++){
+          const t1 = remaining[i], t2 = remaining[j];
+          if (t1.gender !== t2.gender) continue;
+          const o1 = findOwner(t1), o2 = findOwner(t2);
+          if (!o1 || !o2 || o1.group === o2.group) continue;
+
+          const outCandidates = tail.map((p,idx)=> ({p, idx})).filter(({p})=> !p.locked && !targetLatest.includes(p));
+          if (outCandidates.length < 2) continue;
+          const [oc1, oc2] = outCandidates;
+          const helperIdx = o2.group.findIndex((p,idx)=> idx!==o2.idx && p.gender===t2.gender && !p.locked && !targetLatest.includes(p));
+          if (helperIdx === -1) continue;
+          const helper = o2.group[helperIdx];
+
+          const testG1 = o1.group.slice(); testG1[o1.idx] = helper;
+          const testG2 = o2.group.slice(); testG2[o2.idx] = oc1.p; testG2[helperIdx] = oc2.p;
+          const testTail = tail.slice(); testTail[oc1.idx] = t1; testTail[oc2.idx] = t2;
+          if (isValid(testG1) && isValid(testG2) && isValid(testTail)){
+            o1.group[o1.idx] = helper;
+            o2.group[o2.idx] = oc1.p; o2.group[helperIdx] = oc2.p;
+            tail[oc1.idx] = t1; tail[oc2.idx] = t2;
+            remaining = remaining.filter(t=> t!==t1 && t!==t2);
+            break;
+          }
+        }
+      }
+    })();
+
     // assign terreinen: honour explicit surface avoidance first, then fall back to the
     // level-based preference (higher level -> gravel) for whatever slots remain.
     const entries = groups.map(g=> ({
@@ -1549,9 +1504,6 @@
     });
     document.getElementById("uploadSection").style.display = "none";
     document.getElementById("scheduleWrap").classList.add("show");
-    if (liveSheetId) document.getElementById("sheetRefreshBtn").style.display = "";
-    if (liveMemberSheetId) document.getElementById("memberSheetRefreshBtn").style.display = "";
-    if (liveSheetId || liveMemberSheetId) document.getElementById("autoRefreshToggle").style.display = "";
     const dateInput = document.getElementById("scheduleDate");
     if (dateInput && !dateInput.value){
       dateInput.value = isoDate(nextUpcomingMonday());

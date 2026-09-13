@@ -2280,6 +2280,46 @@
     reader.readAsText(file, "UTF-8");
   });
 
+  /* Safari/WebKit (all iOS browsers) requires navigator.share() to be called as directly
+     as possible within an actual click event — even a Promise microtask hop after the
+     original button click can be enough for it to reject with a NotAllowedError. Since
+     rendering the image (html2canvas) takes real time, we can't call share() right from
+     the original click; instead, once the image is ready, we ask for one more click on a
+     dedicated button and call share() as the first line of THAT click handler. */
+  function showShareReadyPrompt(file){
+    const overlay = document.getElementById("confirmOverlay");
+    const yesBtn = document.getElementById("confirmYes");
+    const noBtn = document.getElementById("confirmNo");
+    document.getElementById("confirmTitle").textContent = "Afbeelding klaar";
+    document.getElementById("confirmMessage").textContent = "Klik om te delen — bijvoorbeeld rechtstreeks naar WhatsApp.";
+    yesBtn.textContent = "📤 Delen";
+    noBtn.style.display = "block";
+    overlay.classList.add("show");
+
+    function cleanup(){
+      overlay.classList.remove("show");
+      yesBtn.removeEventListener("click", onShare);
+      noBtn.removeEventListener("click", onCancel);
+      yesBtn.textContent = "OK";
+    }
+    function onShare(){
+      cleanup();
+      navigator.share({ files: [file], title: "Tennis schema", text: "Dubbelavond schema — " + getScheduleDateLabel() })
+        .then(()=>{
+          toast("Afbeelding gedeeld ✅");
+          saveHistoryEntry();
+        })
+        .catch(err=>{
+          if (err && err.name === "AbortError") return; // user cancelled the share sheet themselves
+          console.error("Delen mislukt:", err);
+          notifyError("Foutmelding: " + (err && err.message ? err.message : String(err)), "Delen is mislukt");
+        });
+    }
+    function onCancel(){ cleanup(); }
+    yesBtn.addEventListener("click", onShare);
+    noBtn.addEventListener("click", onCancel);
+  }
+
   document.getElementById("downloadPng").addEventListener("click", ()=>{
     try {
       if (typeof html2canvas === "undefined"){
@@ -2331,15 +2371,8 @@
         // fall back to the classic download link below.
         const canUseShare = file && navigator.canShare && navigator.share && navigator.canShare({ files: [file] });
         if (canUseShare){
-          return navigator.share({ files: [file], title: "Tennis schema", text: "Dubbelavond schema — " + getScheduleDateLabel() })
-            .then(()=>{
-              toast("Afbeelding gedeeld ✅");
-              saveHistoryEntry();
-            })
-            .catch(err=>{
-              if (err && err.name === "AbortError") return; // user cancelled the share sheet themselves
-              throw err;
-            });
+          showShareReadyPrompt(file);
+          return;
         }
 
         const url = URL.createObjectURL(blob);
